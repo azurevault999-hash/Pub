@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Shopify to WooCommerce CSV Converter API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: upload
+    description: File upload
+  - name: analysis
+    description: File analysis
+  - name: validation
+    description: Validation engine
+  - name: conversion
+    description: CSV conversion
+  - name: download
+    description: File downloads
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +33,407 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /upload:
+    post:
+      operationId: uploadFile
+      tags: [upload]
+      summary: Upload Shopify CSV file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileUploadInput"
+      responses:
+        "200":
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+        "400":
+          description: Invalid file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [upload]
+      summary: Get session info
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionInfo"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/analysis:
+    get:
+      operationId: getAnalysis
+      tags: [analysis]
+      summary: Get analysis results for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/validate:
+    post:
+      operationId: runValidation
+      tags: [validation]
+      summary: Run validation on the uploaded file
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/validation:
+    get:
+      operationId: getValidation
+      tags: [validation]
+      summary: Get cached validation results
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/convert:
+    post:
+      operationId: runConversion
+      tags: [conversion]
+      summary: Run conversion to WooCommerce CSV
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversion complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversionResult"
+        "400":
+          description: Conversion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/conversion:
+    get:
+      operationId: getConversion
+      tags: [conversion]
+      summary: Get cached conversion results
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversion results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversionResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/download/{filename}:
+    get:
+      operationId: downloadFile
+      tags: [download]
+      summary: Download a generated output file
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
+    FileUploadInput:
+      type: object
+      properties:
+        file:
+          type: string
+          description: CSV file content (multipart upload)
+      required: [file]
+
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: ["string", "null"]
+      required: [error]
+
+    UploadResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+        row_count:
+          type: integer
+        status:
+          type: string
+        analysis:
+          $ref: "#/components/schemas/AnalysisResult"
+      required: [session_id, filename, size_bytes, row_count, status, analysis]
+
+    SessionInfo:
+      type: object
+      properties:
+        session_id:
+          type: string
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+        row_count:
+          type: integer
+        status:
+          type: string
+        created_at:
+          type: string
+        has_analysis:
+          type: boolean
+        has_validation:
+          type: boolean
+        has_conversion:
+          type: boolean
+      required: [session_id, filename, size_bytes, row_count, status, created_at, has_analysis, has_validation, has_conversion]
+
+    AnalysisResult:
+      type: object
+      properties:
+        product_count:
+          type: integer
+        variant_count:
+          type: integer
+        image_count:
+          type: integer
+        categories:
+          type: array
+          items:
+            type: string
+        vendors:
+          type: array
+          items:
+            type: string
+        product_types:
+          type: array
+          items:
+            type: string
+        duplicate_skus:
+          type: integer
+        missing_prices:
+          type: integer
+        missing_images:
+          type: integer
+        invalid_html_count:
+          type: integer
+        unknown_columns:
+          type: array
+          items:
+            type: string
+        total_rows:
+          type: integer
+      required:
+        - product_count
+        - variant_count
+        - image_count
+        - categories
+        - vendors
+        - product_types
+        - duplicate_skus
+        - missing_prices
+        - missing_images
+        - invalid_html_count
+        - unknown_columns
+        - total_rows
+
+    ValidationIssue:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [pass, warning, error]
+        check:
+          type: string
+        message:
+          type: string
+        count:
+          type: integer
+        details:
+          type: array
+          items:
+            type: string
+      required: [level, check, message, count, details]
+
+    ValidationResult:
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationIssue"
+        pass_count:
+          type: integer
+        warning_count:
+          type: integer
+        error_count:
+          type: integer
+        can_convert:
+          type: boolean
+      required: [issues, pass_count, warning_count, error_count, can_convert]
+
+    ConversionResult:
+      type: object
+      properties:
+        products_converted:
+          type: integer
+        products_failed:
+          type: integer
+        variants_converted:
+          type: integer
+        warnings:
+          type: integer
+        errors:
+          type: integer
+        categories_mapped:
+          type: integer
+        tags_preserved:
+          type: integer
+        images_mapped:
+          type: integer
+        execution_time_seconds:
+          type: number
+        output_files:
+          type: array
+          items:
+            type: string
+        log_lines:
+          type: array
+          items:
+            type: string
+      required:
+        - products_converted
+        - products_failed
+        - variants_converted
+        - warnings
+        - errors
+        - categories_mapped
+        - tags_preserved
+        - images_mapped
+        - execution_time_seconds
+        - output_files
+        - log_lines
