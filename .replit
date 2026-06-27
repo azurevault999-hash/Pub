@@ -11,6 +11,37 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Web App"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/converter-api && BASE_PATH=/api python3 -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
+waitForPort = 8080
+
+[[workflows.workflow]]
+name = "Web App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=20811 BASE_PATH=/ pnpm --filter @workspace/converter-app run dev"
+waitForPort = 20811
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -20,3 +51,5 @@ path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
 [nix]
+channel = "stable-25_05"
+packages = ["glibcLocales", "libxcrypt", "xcodebuild", "zlib"]
