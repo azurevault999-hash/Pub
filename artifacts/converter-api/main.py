@@ -5,15 +5,15 @@ Start with:
     uvicorn main:app --host 0.0.0.0 --port $PORT --reload
 """
 from __future__ import annotations
+
 import os
 import tempfile
 import traceback
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from adapters.shopify import ShopifyAdapter
 from models.schemas import (
@@ -38,13 +38,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Shopify → WooCommerce Converter",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
 BASE_PATH = os.environ.get("BASE_PATH", "/api")
-
-# Strip trailing slash from base path for prefix matching
 _api_prefix = BASE_PATH.rstrip("/")
 
 app.add_middleware(
@@ -73,14 +71,11 @@ async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
     MAX_SIZE = 100 * 1024 * 1024  # 100 MB
-
-    # Write to a temp file
     content = await file.read()
     if len(content) > MAX_SIZE:
         raise HTTPException(status_code=400, detail="File exceeds 100 MB limit.")
 
-    suffix = ".csv"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -208,14 +203,14 @@ async def get_conversion(session_id: str) -> ConversionResult:
 ALLOWED_FILENAMES = {
     "woocommerce_products.csv",
     "migration_report.txt",
-    "validation_report.xlsx",
+    "validation_report.html",
     "conversion_log.txt",
 }
 
 MEDIA_TYPES = {
     ".csv": "text/csv",
     ".txt": "text/plain",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".html": "text/html",
 }
 
 

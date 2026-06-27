@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowRight, ArrowLeft, Search, ChevronDown, CheckCircle2,
-  AlertTriangle, XCircle, RefreshCw, Shield,
+  AlertTriangle, XCircle, RefreshCw, Shield, Info,
 } from "lucide-react";
 import {
   useRunValidation,
@@ -27,6 +27,7 @@ interface ValidationStepProps {
 function LevelBadge({ level }: { level: ValidationIssue["level"] }) {
   if (level === "pass") return <Badge className="bg-green-500/15 text-green-500 border-green-500/30 text-xs">PASS</Badge>;
   if (level === "warning") return <Badge className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 text-xs">WARN</Badge>;
+  if (level === "info") return <Badge className="bg-blue-500/15 text-blue-500 border-blue-500/30 text-xs">INFO</Badge>;
   return <Badge className="bg-red-500/15 text-red-500 border-red-500/30 text-xs">ERROR</Badge>;
 }
 
@@ -149,6 +150,7 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
 
   const errors = filtered.filter((i) => i.level === "error");
   const warnings = filtered.filter((i) => i.level === "warning");
+  const infos = filtered.filter((i) => i.level === "info");
   const passes = filtered.filter((i) => i.level === "pass");
 
   return (
@@ -157,7 +159,7 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
         <div>
           <h2 className="text-2xl font-bold tracking-tight mb-1">Validation Engine</h2>
           <p className="text-muted-foreground text-sm">
-            Run comprehensive checks before converting. Errors must be resolved; warnings are advisory.
+            Run comprehensive checks before converting. Errors block conversion; warnings and info are advisory.
           </p>
         </div>
         <Button
@@ -173,7 +175,6 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
         </Button>
       </div>
 
-      {/* Not run yet */}
       {!hasData && !isRunning && !validationLoading && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -184,7 +185,6 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
         </Card>
       )}
 
-      {/* Loading skeleton */}
       {(isRunning || validationLoading) && (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -193,22 +193,25 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
         </div>
       )}
 
-      {/* Results */}
       {hasData && !isRunning && (
         <>
           {/* Summary bar */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 text-center">
-              <p className="text-2xl font-bold text-green-500 tabular-nums">{validationData.pass_count}</p>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Passed</p>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-center">
+              <p className="text-2xl font-bold text-red-500 tabular-nums">{validationData.error_count}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Errors</p>
             </div>
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-center">
               <p className="text-2xl font-bold text-yellow-500 tabular-nums">{validationData.warning_count}</p>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Warnings</p>
             </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-center">
-              <p className="text-2xl font-bold text-red-500 tabular-nums">{validationData.error_count}</p>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Errors</p>
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-center">
+              <p className="text-2xl font-bold text-blue-500 tabular-nums">{validationData.info_count}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Info</p>
+            </div>
+            <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 text-center">
+              <p className="text-2xl font-bold text-green-500 tabular-nums">{validationData.pass_count}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">Passed</p>
             </div>
           </div>
 
@@ -253,6 +256,12 @@ export function ValidationStep({ sessionId, onNext, onBack }: ValidationStepProp
               issues={warnings}
               icon={AlertTriangle}
               className="border-yellow-500/20"
+            />
+            <GroupPanel
+              title="Informational"
+              issues={infos}
+              icon={Info}
+              className="border-blue-500/20"
             />
             <GroupPanel
               title="Passed Checks"

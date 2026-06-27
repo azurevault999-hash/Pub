@@ -49,7 +49,7 @@ class SessionInfo(BaseModel):
 
 
 class ValidationIssue(BaseModel):
-    level: Literal["pass", "warning", "error"]
+    level: Literal["pass", "info", "warning", "error"]
     check: str
     message: str
     count: int
@@ -59,6 +59,7 @@ class ValidationIssue(BaseModel):
 class ValidationResult(BaseModel):
     issues: list[ValidationIssue]
     pass_count: int
+    info_count: int
     warning_count: int
     error_count: int
     can_convert: bool

@@ -61,6 +61,7 @@ export type ValidationIssueLevel = typeof ValidationIssueLevel[keyof typeof Vali
 
 export const ValidationIssueLevel = {
   pass: 'pass',
+  info: 'info',
   warning: 'warning',
   error: 'error',
 } as const;
@@ -76,6 +77,7 @@ export interface ValidationIssue {
 export interface ValidationResult {
   issues: ValidationIssue[];
   pass_count: number;
+  info_count: number;
   warning_count: number;
   error_count: number;
   can_convert: boolean;
@@ -94,4 +96,3 @@ export interface ConversionResult {
   output_files: string[];
   log_lines: string[];
 }
-

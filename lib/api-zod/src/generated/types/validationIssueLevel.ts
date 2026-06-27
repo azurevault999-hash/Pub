@@ -11,6 +11,7 @@ export type ValidationIssueLevel = typeof ValidationIssueLevel[keyof typeof Vali
 
 export const ValidationIssueLevel = {
   pass: 'pass',
+  info: 'info',
   warning: 'warning',
   error: 'error',
 } as const;

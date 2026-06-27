@@ -361,12 +361,15 @@ components:
         - unknown_columns
         - total_rows
 
+    ValidationIssueLevel:
+      type: string
+      enum: [pass, info, warning, error]
+
     ValidationIssue:
       type: object
       properties:
         level:
-          type: string
-          enum: [pass, warning, error]
+          $ref: "#/components/schemas/ValidationIssueLevel"
         check:
           type: string
         message:
@@ -388,13 +391,15 @@ components:
             $ref: "#/components/schemas/ValidationIssue"
         pass_count:
           type: integer
+        info_count:
+          type: integer
         warning_count:
           type: integer
         error_count:
           type: integer
         can_convert:
           type: boolean
-      required: [issues, pass_count, warning_count, error_count, can_convert]
+      required: [issues, pass_count, info_count, warning_count, error_count, can_convert]
 
     ConversionResult:
       type: object

@@ -10,6 +10,7 @@ import type { ValidationIssue } from './validationIssue';
 export interface ValidationResult {
   issues: ValidationIssue[];
   pass_count: number;
+  info_count: number;
   warning_count: number;
   error_count: number;
   can_convert: boolean;

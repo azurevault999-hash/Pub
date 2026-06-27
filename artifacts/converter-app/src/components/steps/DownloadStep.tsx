@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -7,8 +7,8 @@ import {
   getGetConversionQueryKey,
 } from "@workspace/api-client-react";
 import {
-  Download, FileText, FileSpreadsheet, RefreshCw, CheckCircle2,
-  FileCode, ScrollText,
+  Download, FileText, RefreshCw, CheckCircle2,
+  FileCode, ScrollText, Globe,
 } from "lucide-react";
 
 interface DownloadStepProps {
@@ -33,21 +33,21 @@ const FILE_META: Record<string, {
   "migration_report.txt": {
     icon: ScrollText,
     title: "Migration Report",
-    description: "Full summary of the migration: products converted, failures, warnings, and timing statistics.",
+    description: "Full summary of the migration: products, variants, images, categories, tags, warnings, errors, and timing statistics.",
     badge: "Report",
     badgeVariant: "secondary",
   },
-  "validation_report.xlsx": {
-    icon: FileSpreadsheet,
+  "validation_report.html": {
+    icon: Globe,
     title: "Validation Report",
-    description: "Colour-coded Excel spreadsheet with all validation check results (PASS / WARNING / ERROR).",
-    badge: "Excel",
+    description: "Interactive HTML report with all validation results (ERROR / WARN / INFO / PASS) — searchable and filterable.",
+    badge: "HTML",
     badgeVariant: "secondary",
   },
   "conversion_log.txt": {
     icon: FileText,
     title: "Conversion Log",
-    description: "Timestamped log of every step taken during conversion, including warnings and stack traces.",
+    description: "Timestamped log of every step taken during conversion, including warnings and any errors.",
     badge: "Log",
     badgeVariant: "outline",
   },

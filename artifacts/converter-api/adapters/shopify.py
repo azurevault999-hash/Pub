@@ -1,9 +1,11 @@
 """Shopify CSV import adapter."""
 from __future__ import annotations
-import re
+
 import chardet
 import pandas as pd
+
 from adapters.base import ImportAdapter, NormalizedProduct, NormalizedVariant
+from services.utils import _str, _bool, _float, _int
 
 SHOPIFY_KNOWN_COLUMNS = {
     "Handle", "Title", "Body (HTML)", "Vendor", "Product Category", "Type",
@@ -31,37 +33,24 @@ def _detect_encoding(filepath: str) -> str:
         raw = f.read(32768)
     result = chardet.detect(raw)
     enc = result.get("encoding") or "utf-8"
-    # Normalise common variants
     if enc.lower() in ("utf-8-sig", "utf-8"):
         return "utf-8-sig"
     return enc
 
 
-def _str(val: object) -> str:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return ""
-    return str(val).strip()
+def _is_variant_row(row: pd.Series) -> bool:
+    """
+    Return True if *row* carries variant data (price or option values present).
 
-
-def _bool(val: object) -> bool:
-    s = _str(val).lower()
-    return s in ("true", "yes", "1")
-
-
-def _float(val: object, default: float = 0.0) -> float:
-    s = _str(val)
-    try:
-        return float(s) if s else default
-    except ValueError:
-        return default
-
-
-def _int(val: object, default: int = 0) -> int:
-    s = _str(val)
-    try:
-        return int(float(s)) if s else default
-    except ValueError:
-        return default
+    Shopify exports additional image rows for products with multiple images.
+    These rows have Handle and Image Src but no Variant Price and no Option
+    values.  Including them as variants creates phantom/empty variations.
+    """
+    price = _str(row.get("Variant Price", ""))
+    opt1 = _str(row.get("Option1 Value", ""))
+    opt2 = _str(row.get("Option2 Value", ""))
+    opt3 = _str(row.get("Option3 Value", ""))
+    return bool(price or opt1 or opt2 or opt3)
 
 
 class ShopifyAdapter(ImportAdapter):
@@ -76,7 +65,6 @@ class ShopifyAdapter(ImportAdapter):
     def read(self, filepath: str) -> pd.DataFrame:
         enc = _detect_encoding(filepath)
         df = pd.read_csv(filepath, encoding=enc, keep_default_na=False, dtype=str)
-        # Strip whitespace from column names
         df.columns = [c.strip() for c in df.columns]
         return df
 
@@ -86,23 +74,19 @@ class ShopifyAdapter(ImportAdapter):
     def normalize(self, df: pd.DataFrame) -> list[NormalizedProduct]:
         """Group rows by Handle and build NormalizedProduct objects."""
         products: list[NormalizedProduct] = []
-        seen_images: dict[str, set[str]] = {}  # handle -> set of image srcs
 
         for handle, group in df.groupby("Handle", sort=False):
             handle = _str(handle)
             if not handle:
                 continue
 
-            # Use first row for product-level fields
             first = group.iloc[0]
-            seen_images[handle] = set()
 
-            # Discover which option names are used
             opt1_name = _str(first.get("Option1 Name", ""))
             opt2_name = _str(first.get("Option2 Name", ""))
             opt3_name = _str(first.get("Option3 Name", ""))
 
-            # Collect images from all rows
+            # Collect images from all rows (de-duplicated, sorted by position)
             images: list[tuple[str, int, str]] = []
             image_srcs_seen: set[str] = set()
             for _, row in group.iterrows():
@@ -112,13 +96,14 @@ class ShopifyAdapter(ImportAdapter):
                     pos = _int(row.get("Image Position", ""), 0)
                     alt = _str(row.get("Image Alt Text", ""))
                     images.append((src, pos, alt))
-
-            # Sort images by position
             images.sort(key=lambda x: x[1])
 
-            # Build variants
+            # Build variants — skip image-only rows that carry no variant data
             variants: list[NormalizedVariant] = []
             for _, row in group.iterrows():
+                if not _is_variant_row(row):
+                    continue
+
                 sku = _str(row.get("Variant SKU", ""))
                 price = _str(row.get("Variant Price", ""))
                 cap = _str(row.get("Variant Compare At Price", ""))
@@ -147,12 +132,21 @@ class ShopifyAdapter(ImportAdapter):
                     requires_shipping=requires_shipping,
                 ))
 
+            # Shopify always has at least one variant row per product.
+            # If somehow all rows were image-only, skip the product.
+            if not variants:
+                continue
+
             tags_raw = _str(first.get("Tags", ""))
             tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
 
             body = _str(first.get("Body (HTML)", ""))
+
+            # Published: Shopify Published column is "true"/"false".
+            # Status column ("active"/"draft"/"archived") is separate.
             published_raw = _str(first.get("Published", "true"))
-            published = published_raw.lower() not in ("false", "0", "draft", "no")
+            published = published_raw.lower() not in ("false", "0", "no")
+            status = _str(first.get("Status", "active")).lower() or "active"
 
             product = NormalizedProduct(
                 handle=handle,
@@ -164,7 +158,7 @@ class ShopifyAdapter(ImportAdapter):
                 published=published,
                 seo_title=_str(first.get("SEO Title", "")),
                 seo_description=_str(first.get("SEO Description", "")),
-                status=_str(first.get("Status", "active")),
+                status=status,
                 option1_name=opt1_name,
                 option2_name=opt2_name,
                 option3_name=opt3_name,
