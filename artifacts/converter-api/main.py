@@ -202,6 +202,7 @@ async def get_conversion(session_id: str) -> ConversionResult:
 
 ALLOWED_FILENAMES = {
     "woocommerce_products.csv",
+    "variation_audit.csv",
     "migration_report.txt",
     "validation_report.html",
     "conversion_log.txt",

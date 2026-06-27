@@ -1,0 +1,1 @@
+- [WooCommerce 10.9.1 CSV schema](woocommerce-csv-schema.md) — comma separator for attrs, "Attribute N default" not "used for variations", verified against live WC export

@@ -7,7 +7,10 @@ import time
 from datetime import datetime, timezone
 
 from adapters.shopify import ShopifyAdapter
-from adapters.woocommerce import WooCommerceAdapter, _is_variable, _active_option_count, _all_option_values, verify_woocommerce_csv
+from adapters.woocommerce import (
+    WooCommerceAdapter, _is_variable, _active_option_count, _all_option_values,
+    verify_woocommerce_csv, compare_schema_to_reference,
+)
 from models.schemas import ConversionResult, ValidationResult
 from services.report_generator import (
     generate_conversion_log,
@@ -160,15 +163,31 @@ def convert(
         f"Variants: {variants_converted}. Images: {images_mapped}."
     )
 
+    # ── Schema sanity check ────────────────────────────────────────────────
+    schema_check = compare_schema_to_reference()
+    if schema_check["schema_valid"]:
+        logger.info(
+            f"Column schema matches WooCommerce 10.9.1 reference "
+            f"({schema_check['our_column_count']} columns, "
+            f"{schema_check['reference_column_count']} in reference)."
+        )
+    else:
+        for missing in schema_check["missing_from_ours"]:
+            logger.warn(f"[SCHEMA] Column missing vs WooCommerce 10.9.1 reference: '{missing}'")
+
     # ── Export to WooCommerce CSV ──────────────────────────────────────────
     output_files: list[str] = []
     woo_output = os.path.join(output_dir, "woocommerce_products.csv")
+    audit_output = os.path.join(output_dir, "variation_audit.csv")
     woo = WooCommerceAdapter()
     rows_written = 0
     try:
-        rows_written = woo.export(valid_products, woo_output)
+        rows_written = woo.export(valid_products, woo_output, audit_path=audit_output)
         output_files.append("woocommerce_products.csv")
         logger.info(f"Exported {rows_written} WooCommerce row(s) to CSV.")
+        if os.path.isfile(audit_output):
+            output_files.append("variation_audit.csv")
+            logger.info("Generated variation_audit.csv")
     except Exception as exc:
         logger.error(f"WooCommerce export failed: {exc}")
 

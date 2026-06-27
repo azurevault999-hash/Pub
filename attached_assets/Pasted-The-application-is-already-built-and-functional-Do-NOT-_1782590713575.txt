@@ -1,0 +1,295 @@
+The application is already built and functional. Do NOT rewrite it or replace working code. Perform a targeted engineering fix to make the generated CSV fully compatible with WooCommerce 10.9.1's native Product CSV Importer.
+
+BACKGROUND
+
+The converter successfully imports:
+
+- Products
+- Images
+- Categories
+- Prices
+- Variable products
+- Variations
+
+However, imported variable products are not purchasable.
+
+Observed behaviour after import:
+
+• Variable product exists.
+• Correct number of variations exists.
+• Storefront variation dropdowns are empty.
+• Add to Cart is disabled.
+• In WooCommerce every variation displays "Any".
+• The Default Form Values dropdown shows a single concatenated value like:
+
+XS | S | M | L | XL | 2XL | 3XL
+
+instead of seven individual values.
+
+This indicates the generated CSV does not match WooCommerce's expected variation schema.
+
+REFERENCE
+
+A WooCommerce 10.9.1 variable product has already been manually created and exported.
+
+Treat the WooCommerce export as the canonical specification.
+
+Do not guess the schema.
+Do not rely solely on documentation.
+Generate CSV output that mirrors WooCommerce's own exported structure wherever possible.
+
+REQUIRED CHANGES
+
+1. Dynamic Shopify Attribute Detection
+
+Never assume products only use Size.
+
+Support every Shopify option combination.
+
+Option1 Name
+Option2 Name
+Option3 Name
+
+Examples:
+
+Size
+Color
+Gender
+Material
+Style
+Qty
+Title
+
+Any custom option name.
+
+2. Parent Variable Product
+
+Generate one parent product.
+
+Populate:
+
+Product Type
+
+Attributes
+
+All attribute values
+
+Visible
+
+Variation-enabled
+
+Global/local attribute flags
+
+Use exactly the same formatting used by WooCommerce exports.
+
+Do not concatenate values incorrectly.
+
+3. Variation Rows
+
+Each Shopify variant must generate exactly one WooCommerce variation.
+
+Every variation must explicitly contain:
+
+Parent
+
+Type = variation
+
+Attribute 1 Name
+
+Attribute 1 Value
+
+Attribute 2 Name
+
+Attribute 2 Value
+
+Attribute 3 Name
+
+Attribute 3 Value
+
+Never generate "Any".
+
+Every variation must map to one valid attribute combination.
+
+4. Compare Against WooCommerce Export
+
+Implement an internal comparison between the generated CSV and the WooCommerce export.
+
+Verify:
+
+Column names
+
+Parent structure
+
+Variation structure
+
+Attribute structure
+
+Parent references
+
+Image columns
+
+Inventory columns
+
+Pricing columns
+
+The generated CSV should structurally match WooCommerce's export.
+
+5. Attribute Validation
+
+Before writing the CSV verify:
+
+✓ Parent contains every attribute.
+
+✓ Parent contains every possible value.
+
+✓ Every variation contains one value for every required attribute.
+
+✓ Every variation value exists within the parent's values.
+
+✓ No variation resolves to "Any".
+
+✓ Every variation has a valid parent.
+
+✓ Every variation is purchasable.
+
+Abort only if structural validation fails.
+
+6. Image Handling
+
+Keep existing behaviour.
+
+Do NOT download images.
+
+Use Shopify CDN URLs.
+
+Generate:
+
+Featured Image
+
+Gallery Images
+
+Remove duplicate image URLs.
+
+Preserve ordering.
+
+7. Validation Levels
+
+ERROR
+
+Malformed CSV
+
+Missing Handle
+
+Missing Title
+
+Broken parent relationships
+
+Impossible WooCommerce output
+
+WARNING
+
+Missing Variant Image
+
+Missing Barcode
+
+Missing Weight
+
+Missing SEO
+
+Missing Compare-at Price
+
+Blank Vendor
+
+Warnings must never block conversion.
+
+8. Diagnostics
+
+Generate:
+
+variation_audit.csv
+
+Include:
+
+Shopify Handle
+
+Shopify Variant SKU
+
+WooCommerce Parent
+
+WooCommerce Type
+
+Option1 Name
+
+Option1 Value
+
+Option2 Name
+
+Option2 Value
+
+Option3 Name
+
+Option3 Value
+
+Generated Attribute Mapping
+
+Validation Result
+
+Notes
+
+9. Reports
+
+Update validation_report.html
+
+Include:
+
+Products
+
+Variable Products
+
+Simple Products
+
+Variations
+
+Attribute Mapping Summary
+
+Warnings
+
+Errors
+
+Conversion Statistics
+
+10. Automated Verification
+
+After generating woocommerce_products.csv perform an internal verification.
+
+Confirm:
+
+Every variation is attached to a parent.
+
+Every variation attribute matches a parent attribute.
+
+Every attribute dropdown will contain individual selectable values.
+
+No variation will import as "Any".
+
+No required WooCommerce fields are blank.
+
+Every variation is purchasable.
+
+Do not mark the task complete until all checks pass.
+
+ACCEPTANCE CRITERIA
+
+The generated CSV must import into WooCommerce 10.9.1 using the native Product CSV Importer and produce:
+
+✓ Correct variable products.
+✓ Individual selectable dropdown values.
+✓ No concatenated dropdown values.
+✓ No "Any" variations.
+✓ Correct parent-child relationships.
+✓ Enabled Add to Cart.
+✓ No manual editing required after import.
+
+IMPORTANT
+
+Before changing code, inspect the existing implementation and identify the exact cause of the variation mapping failure. Fix the root cause rather than introducing workarounds. Preserve all existing working functionality while making the converter fully compatible with WooCommerce 10.9.1.

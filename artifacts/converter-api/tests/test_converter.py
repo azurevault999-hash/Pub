@@ -258,10 +258,15 @@ class TestSimpleProductExport:
     def test_published(self):
         assert self.rows[0]["Published"] == "1"
 
-    def test_used_for_variations_is_zero_on_simple(self):
-        """Simple products must never set 'used for variations' = 1."""
+    def test_wc_10_9_1_schema_columns_present_on_simple(self):
+        """WooCommerce 10.9.1 uses 'Attribute N default', not 'used for variations'."""
         for n in ("1", "2", "3"):
-            assert self.rows[0].get(f"Attribute {n} used for variations", "0") != "1"
+            assert f"Attribute {n} default" in self.rows[0], (
+                f"Attribute {n} default column missing (WooCommerce 10.9.1 schema)"
+            )
+            assert f"Attribute {n} used for variations" not in self.rows[0], (
+                f"Legacy 'used for variations' column must not appear in WC 10.9.1 output"
+            )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -327,9 +332,11 @@ class TestSingleAttributeVariable:
         for size in ("S", "M", "L", "XL"):
             assert size in parent_vals
 
-    def test_parent_used_for_variations(self):
-        """Critical flag — must be '1' or dropdowns will be empty."""
-        assert self.rows[0]["Attribute 1 used for variations"] == "1"
+    def test_parent_attribute_global_and_visible(self):
+        """WooCommerce 10.9.1: parent attribute must be global=1 and visible=1.
+        'used for variations' is inferred from variation rows in WC 10.9.1."""
+        assert self.rows[0]["Attribute 1 global"] == "1"
+        assert self.rows[0]["Attribute 1 visible"] == "1"
 
     def test_variation_attribute_single_value(self):
         """Each variation must carry exactly its own size, not all sizes."""
@@ -390,10 +397,12 @@ class TestTwoAttributeVariable:
         assert "S" in size_vals
         assert "M" in size_vals
 
-    def test_parent_both_used_for_variations(self):
-        """Both attribute dimensions must be flagged for variations."""
-        assert self.rows[0]["Attribute 1 used for variations"] == "1"
-        assert self.rows[0]["Attribute 2 used for variations"] == "1"
+    def test_parent_both_attributes_global_and_visible(self):
+        """WooCommerce 10.9.1: both parent attributes must be global=1 and visible=1."""
+        assert self.rows[0]["Attribute 1 global"] == "1"
+        assert self.rows[0]["Attribute 1 visible"] == "1"
+        assert self.rows[0]["Attribute 2 global"] == "1"
+        assert self.rows[0]["Attribute 2 visible"] == "1"
 
     def test_variation_colour_single_value(self):
         variation_rows = [r for r in self.rows if r["Type"] == "variation"]
@@ -456,10 +465,14 @@ class TestThreeAttributeVariable:
         assert self.rows[0]["Attribute 2 name"] == "Size"
         assert self.rows[0]["Attribute 3 name"] == "Gender"
 
-    def test_parent_all_three_used_for_variations(self):
-        assert self.rows[0]["Attribute 1 used for variations"] == "1"
-        assert self.rows[0]["Attribute 2 used for variations"] == "1"
-        assert self.rows[0]["Attribute 3 used for variations"] == "1"
+    def test_parent_all_three_attributes_global_and_visible(self):
+        """WooCommerce 10.9.1: all three parent attributes must be global=1 and visible=1."""
+        assert self.rows[0]["Attribute 1 global"] == "1"
+        assert self.rows[0]["Attribute 1 visible"] == "1"
+        assert self.rows[0]["Attribute 2 global"] == "1"
+        assert self.rows[0]["Attribute 2 visible"] == "1"
+        assert self.rows[0]["Attribute 3 global"] == "1"
+        assert self.rows[0]["Attribute 3 visible"] == "1"
 
     def test_parent_gender_all_values(self):
         gender_vals = self.rows[0]["Attribute 3 value(s)"]
@@ -584,15 +597,22 @@ class TestVariableProductExport:
         """Variable product parent stock must be blank (tracked per variation)."""
         assert self.rows[0]["Stock"] == ""
 
-    def test_parent_used_for_variations_set(self):
-        """Attribute 1 and 2 must be flagged as used for variations on the parent."""
-        assert self.rows[0]["Attribute 1 used for variations"] == "1"
-        assert self.rows[0]["Attribute 2 used for variations"] == "1"
+    def test_parent_attributes_global_and_visible(self):
+        """WooCommerce 10.9.1: parent attributes must be global=1 and visible=1."""
+        assert self.rows[0]["Attribute 1 global"] == "1"
+        assert self.rows[0]["Attribute 1 visible"] == "1"
+        assert self.rows[0]["Attribute 2 global"] == "1"
+        assert self.rows[0]["Attribute 2 visible"] == "1"
 
-    def test_variation_used_for_variations_not_set(self):
-        """Variation rows do not need 'used for variations' = 1."""
+    def test_variation_attribute_visible_and_default_are_empty(self):
+        """WooCommerce 10.9.1: variation rows must have empty visible and default."""
         for row in self.rows[1:]:
-            assert row.get("Attribute 1 used for variations", "0") != "1"
+            assert row.get("Attribute 1 visible", "") == "", (
+                "Variation Attribute 1 visible must be empty (WooCommerce 10.9.1)"
+            )
+            assert row.get("Attribute 1 default", "") == "", (
+                "Variation Attribute 1 default must be empty (WooCommerce 10.9.1)"
+            )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -793,8 +813,9 @@ class TestVerifyWooCommerceCsv:
             os.unlink(path)
         assert errors == [], f"Unexpected errors: {errors}"
 
-    def test_used_for_variations_is_present_in_output(self):
-        """The generated CSV must have 'Attribute N used for variations' columns."""
+    def test_wc_10_9_1_attribute_columns_in_output(self):
+        """WooCommerce 10.9.1 uses 'Attribute N default', not 'used for variations'.
+        Generated CSV must have the correct column names."""
         product = _product(
             handle="check-cols",
             option1_name="Size",
@@ -809,9 +830,15 @@ class TestVerifyWooCommerceCsv:
                 headers = next(csv.reader(f))
         finally:
             os.unlink(path)
-        assert "Attribute 1 used for variations" in headers
-        assert "Attribute 2 used for variations" in headers
-        assert "Attribute 3 used for variations" in headers
+        assert "Attribute 1 default" in headers, "WC 10.9.1 requires 'Attribute 1 default'"
+        assert "Attribute 2 default" in headers, "WC 10.9.1 requires 'Attribute 2 default'"
+        assert "Attribute 3 default" in headers, "WC 10.9.1 requires 'Attribute 3 default'"
+        assert "Attribute 1 used for variations" not in headers, (
+            "Legacy column 'used for variations' must not appear in WC 10.9.1 output"
+        )
+        assert "GTIN, UPC, EAN, or ISBN" in headers, "WC 10.9.1 requires GTIN column"
+        assert "Low stock amount" in headers, "WC 10.9.1 requires Low stock amount column"
+        assert "Brands" in headers, "WC 10.9.1 requires Brands column"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -864,10 +891,15 @@ class TestAttributeMapping:
         rows = _export([product])
         assert rows[0]["Attribute 1 visible"] == "1"
 
-    def test_parent_variation_attribute_values_pipe_separated(self):
-        """Parent attribute value list must use ' | ' as separator."""
+    def test_parent_attribute_values_comma_separated(self):
+        """WooCommerce 10.9.1: parent attribute value list must use ', ' as separator.
+
+        CRITICAL: WooCommerce splits on comma — not pipe.  If pipe is used,
+        the importer treats the entire concatenated string as ONE attribute value,
+        causing every variation to display 'Any' in the storefront.
+        """
         product = _product(
-            handle="pipe-test",
+            handle="comma-test",
             option1_name="Size",
             variants=[
                 _variant(sku="P-S", option1_value="S", price="10.00"),
@@ -877,7 +909,11 @@ class TestAttributeMapping:
         )
         rows = _export([product])
         parent_vals = rows[0]["Attribute 1 value(s)"]
-        assert " | " in parent_vals, f"Values not pipe-separated: {parent_vals!r}"
+        assert "|" not in parent_vals, (
+            f"Parent values must NOT contain pipe — WooCommerce 10.9.1 "
+            f"does not split on pipe: {parent_vals!r}"
+        )
+        assert ", " in parent_vals, f"Values must be comma-separated: {parent_vals!r}"
 
     def test_parent_preserves_value_order(self):
         """Parent attribute values must preserve insertion order (S, M, L, XL)."""
@@ -893,7 +929,10 @@ class TestAttributeMapping:
         )
         rows = _export([product])
         parent_vals = rows[0]["Attribute 1 value(s)"]
-        assert parent_vals == "S | M | L | XL", f"Wrong order: {parent_vals!r}"
+        assert parent_vals == "S, M, L, XL", (
+            f"Wrong order or separator (expected comma-separated, "
+            f"WooCommerce 10.9.1 format): {parent_vals!r}"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

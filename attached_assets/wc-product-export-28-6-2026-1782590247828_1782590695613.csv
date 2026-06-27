@@ -1,0 +1,14 @@
+﻿ID,Type,SKU,"GTIN, UPC, EAN, or ISBN",Name,Published,"Is featured?","Visibility in catalog","Short description",Description,"Date sale price starts","Date sale price ends","Tax status","Tax class","In stock?",Stock,"Low stock amount","Backorders allowed?","Sold individually?","Weight (kg)","Length (cm)","Width (cm)","Height (cm)","Allow customer reviews?","Purchase note","Sale price","Regular price",Categories,Tags,"Shipping class",Images,"Download limit","Download expiry days",Parent,"Grouped products",Upsells,Cross-sells,"External URL","Button text",Position,Brands,"Attribute 1 name","Attribute 1 value(s)","Attribute 1 visible","Attribute 1 global","Attribute 1 default","Attribute 2 name","Attribute 2 value(s)","Attribute 2 visible","Attribute 2 global","Attribute 2 default"
+1028,variable,,,"Test Var Product",-1,0,visible,"<p><br data-mce-bogus=""1""></p>","Dummy Product for testing variants",,,taxable,,1,,,0,0,,,,,1,,,,,,,,,,,,,,,,0,,Size,"L, M, S, XL",1,1,M,Color,"Azure, Burgundy, Maroon",1,1,Maroon
+1029,variation,,,"Test Var Product - L, Azure",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,1,,Size,L,,1,,Color,Azure,,1,
+1030,variation,,,"Test Var Product - L, Burgundy",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,2,,Size,L,,1,,Color,Burgundy,,1,
+1031,variation,,,"Test Var Product - L, Maroon",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,3,,Size,L,,1,,Color,Maroon,,1,
+1032,variation,,,"Test Var Product - M, Azure",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,4,,Size,M,,1,,Color,Azure,,1,
+1033,variation,,,"Test Var Product - M, Burgundy",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,5,,Size,M,,1,,Color,Burgundy,,1,
+1034,variation,,,"Test Var Product - M, Maroon",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,6,,Size,M,,1,,Color,Maroon,,1,
+1035,variation,,,"Test Var Product - S, Azure",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,7,,Size,S,,1,,Color,Azure,,1,
+1036,variation,,,"Test Var Product - S, Burgundy",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,8,,Size,S,,1,,Color,Burgundy,,1,
+1037,variation,,,"Test Var Product - S, Maroon",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,9,,Size,S,,1,,Color,Maroon,,1,
+1038,variation,,,"Test Var Product - XL, Azure",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,10,,Size,XL,,1,,Color,Azure,,1,
+1039,variation,,,"Test Var Product - XL, Burgundy",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,11,,Size,XL,,1,,Color,Burgundy,,1,
+1040,variation,,,"Test Var Product - XL, Maroon",-1,0,visible,,,,,taxable,parent,1,,,0,0,,,,,0,,,1009,,,,,,,id:1028,,,,,,12,,Size,XL,,1,,Color,Maroon,,1,
