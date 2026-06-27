@@ -10,15 +10,13 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "cd /home/runner/workspace/artifacts/converter-api && BASE_PATH=/api uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
+run = "cd /home/runner/workspace/artifacts/converter-api && BASE_PATH=/api python3 -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
 
 [services.production]
+build = ["bash", "-c", "pip install -r /home/runner/workspace/artifacts/converter-api/requirements.txt --break-system-packages --quiet"]
+run = "cd /home/runner/workspace/artifacts/converter-api && python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT"
 
-[services.production.run]
-args = ["bash", "-c", "cd /home/runner/workspace/artifacts/converter-api && uvicorn main:app --host 0.0.0.0 --port 8080"]
-
-[services.production.run.env]
-PORT = "8080"
+[services.production.env]
 BASE_PATH = "/api"
 
 [services.production.health.startup]

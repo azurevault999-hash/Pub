@@ -18,7 +18,7 @@ localPort = 20811
 run = "pnpm --filter @workspace/converter-app run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/converter-app", "run", "build" ]
+build = ["bash", "-c", "PORT=20811 BASE_PATH=/ pnpm --filter @workspace/converter-app run build"]
 publicDir = "artifacts/converter-app/dist/public"
 serve = "static"
 
