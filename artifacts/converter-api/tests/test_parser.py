@@ -113,8 +113,8 @@ class TestMultipleImages:
     CSV = """\
         Handle,Title,Option1 Name,Option1 Value,Variant SKU,Variant Price,Variant Grams,Variant Inventory Qty,Variant Taxable,Image Src,Image Position
         photo-book,Photo Book,Title,Default Title,PB-001,29.99,300,5,true,http://cdn.example.com/img1.jpg,1
-        photo-book,,,,,,,,,,http://cdn.example.com/img2.jpg,2
-        photo-book,,,,,,,,,,http://cdn.example.com/img3.jpg,3
+        photo-book,,,,,,,,,http://cdn.example.com/img2.jpg,2
+        photo-book,,,,,,,,,http://cdn.example.com/img3.jpg,3
     """
 
     def setup_method(self):
@@ -251,7 +251,7 @@ class TestDuplicateImages:
     CSV = """\
         Handle,Title,Option1 Name,Option1 Value,Variant SKU,Variant Price,Variant Taxable,Image Src,Image Position
         prod-x,Product X,Title,Default Title,X-001,5.00,true,http://cdn.example.com/same.jpg,1
-        prod-x,,,,,,,,http://cdn.example.com/same.jpg,2
+        prod-x,,,,,,,http://cdn.example.com/same.jpg,2
     """
 
     def setup_method(self):

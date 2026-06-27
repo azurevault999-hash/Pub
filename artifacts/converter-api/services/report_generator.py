@@ -38,6 +38,12 @@ def generate_migration_report(
         f"  Failed / skipped        :  {result.products_failed}",
         "",
         "─" * 70,
+        "  PRODUCT TYPE BREAKDOWN",
+        "─" * 70,
+        f"  Simple products         :  {result.simple_products}",
+        f"  Variable products       :  {result.variable_products}",
+        "",
+        "─" * 70,
         "  VARIANTS",
         "─" * 70,
         f"  Variants converted      :  {result.variants_converted}",
@@ -66,6 +72,33 @@ def generate_migration_report(
     ]
     for f in result.output_files:
         lines.append(f"  •  {f}")
+
+    # ── Post-export verification results ──────────────────────────────────
+    lines += [
+        "",
+        "─" * 70,
+        "  WOO COMMERCE CSV VERIFICATION",
+        "─" * 70,
+    ]
+    if not result.verification_errors:
+        lines.append(
+            "  ✓  Verification passed — CSV is valid for WooCommerce 10.9.1 native importer."
+        )
+        lines.append(
+            "     • All variation attributes are assigned concrete values (no 'Any')."
+        )
+        lines.append(
+            "     • All parent attributes are marked 'used for variations = 1'."
+        )
+        lines.append(
+            "     • All parent/variation relationships are intact."
+        )
+    else:
+        lines.append(
+            f"  ✗  Verification found {len(result.verification_errors)} issue(s):"
+        )
+        for ve in result.verification_errors:
+            lines.append(f"     • {ve}")
 
     if warnings_lines:
         lines += [
@@ -131,6 +164,7 @@ _HTML_TEMPLATE = """\
   .wrap{{max-width:960px;margin:0 auto}}
   header{{margin-bottom:2rem}}
   h1{{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}}
+  h2{{font-size:1rem;font-weight:700;margin:1.5rem 0 .75rem}}
   .meta{{color:var(--muted);font-size:.875rem}}
   .summary{{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem}}
   .stat{{border-radius:.5rem;padding:.75rem 1.25rem;border:1px solid var(--border);
@@ -142,10 +176,16 @@ _HTML_TEMPLATE = """\
   .stat.warn {{background:var(--c-warn-bg); border-color:var(--c-warn); color:var(--c-warn)}}
   .stat.info {{background:var(--c-info-bg); border-color:var(--c-info); color:var(--c-info)}}
   .stat.pass {{background:var(--c-pass-bg); border-color:var(--c-pass); color:var(--c-pass)}}
-  .stat.label{{ color:var(--muted) }}
   .banner{{border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1.5rem;font-size:.875rem;font-weight:600}}
   .banner.ok{{background:var(--c-pass-bg);border:1px solid var(--c-pass);color:var(--c-pass)}}
   .banner.blocked{{background:var(--c-error-bg);border:1px solid var(--c-error);color:var(--c-error)}}
+  .stats-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+               gap:.75rem;margin-bottom:1.5rem}}
+  .stats-card{{background:var(--card);border:1px solid var(--border);border-radius:.5rem;
+               padding:.75rem 1rem}}
+  .stats-card .sc-label{{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;
+                          color:var(--muted);margin-bottom:.25rem}}
+  .stats-card .sc-value{{font-size:1.1rem;font-weight:700}}
   .controls{{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:1rem}}
   #search{{flex:1;min-width:180px;padding:.45rem .75rem;border:1px solid var(--border);
            border-radius:.375rem;font-size:.875rem;outline:none}}
@@ -206,6 +246,8 @@ _HTML_TEMPLATE = """\
 
 <div class="banner {banner_cls}">{banner_msg}</div>
 
+{stats_section}
+
 <div class="controls">
   <input id="search" type="search" placeholder="Search checks…" oninput="applyFilters()">
   <div class="filters">
@@ -258,6 +300,67 @@ document.querySelectorAll('.issue-header').forEach(h=>{{
 </body>
 </html>
 """
+
+
+def _build_stats_section(result: ValidationResult) -> str:
+    """
+    Extract key stats (product count, variant count, product type breakdown,
+    attribute names) from the info-level issues and render a dashboard card row.
+    """
+    csv_stats_msg = ""
+    type_breakdown_msg = ""
+    attr_mapping_msg = ""
+    simple_count = ""
+    variable_count = ""
+    attr_count = ""
+
+    for issue in result.issues:
+        if issue.check == "CSV Statistics":
+            csv_stats_msg = issue.message
+        elif issue.check == "Product Type Breakdown":
+            type_breakdown_msg = issue.message
+            for d in issue.details:
+                if d.startswith("Simple:"):
+                    simple_count = d.split(":", 1)[1].strip()
+                elif d.startswith("Variable:"):
+                    variable_count = d.split(":", 1)[1].strip()
+        elif issue.check == "Attribute Mapping":
+            attr_count = str(issue.count)
+
+    if not csv_stats_msg and not type_breakdown_msg:
+        return ""
+
+    cards: list[str] = []
+
+    if simple_count or variable_count:
+        cards.append(
+            f'<div class="stats-card">'
+            f'<div class="sc-label">Simple Products</div>'
+            f'<div class="sc-value">{html_module.escape(simple_count or "—")}</div>'
+            f'</div>'
+        )
+        cards.append(
+            f'<div class="stats-card">'
+            f'<div class="sc-label">Variable Products</div>'
+            f'<div class="sc-value">{html_module.escape(variable_count or "—")}</div>'
+            f'</div>'
+        )
+
+    if attr_count:
+        cards.append(
+            f'<div class="stats-card">'
+            f'<div class="sc-label">Distinct Attributes</div>'
+            f'<div class="sc-value">{html_module.escape(attr_count)}</div>'
+            f'</div>'
+        )
+
+    if not cards:
+        return ""
+
+    return (
+        f'<h2>CSV Statistics</h2>'
+        f'<div class="stats-grid">{"".join(cards)}</div>'
+    )
 
 
 def _render_issue(issue_data: dict) -> str:
@@ -317,6 +420,8 @@ def generate_validation_html(
             f"✗ Conversion blocked — {result.error_count} error(s) must be resolved before converting."
         )
 
+    stats_section = _build_stats_section(result)
+
     # Group issues by level for ordered rendering
     order = ["error", "warning", "info", "pass"]
     by_level: dict[str, list] = {k: [] for k in order}
@@ -362,6 +467,7 @@ def generate_validation_html(
         pass_count=result.pass_count,
         banner_cls=banner_cls,
         banner_msg=banner_msg,
+        stats_section=stats_section,
         issues_html=issues_html,
     )
 

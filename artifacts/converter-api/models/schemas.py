@@ -77,3 +77,8 @@ class ConversionResult(BaseModel):
     execution_time_seconds: float
     output_files: list[str]
     log_lines: list[str]
+    # Product type breakdown (added for enhanced migration report)
+    simple_products: int = 0
+    variable_products: int = 0
+    # Post-export verification results
+    verification_errors: list[str] = []

@@ -6,10 +6,8 @@ import os
 import time
 from datetime import datetime, timezone
 
-import pandas as pd
-
 from adapters.shopify import ShopifyAdapter
-from adapters.woocommerce import WooCommerceAdapter
+from adapters.woocommerce import WooCommerceAdapter, _is_variable, _active_option_count, _all_option_values, verify_woocommerce_csv
 from models.schemas import ConversionResult, ValidationResult
 from services.report_generator import (
     generate_conversion_log,
@@ -90,13 +88,15 @@ def convert(
         logger.error(f"Normalization failed: {exc}")
         products = []
 
-    # ── Per-product metrics ────────────────────────────────────────────────
+    # ── Per-product metrics and logging ───────────────────────────────────
     products_converted = 0
     products_failed = 0
     variants_converted = 0
     categories_mapped = 0
     tags_preserved = 0
     images_mapped = 0
+    simple_products = 0
+    variable_products = 0
     valid_products = []
 
     for p in products:
@@ -104,6 +104,44 @@ def convert(
             logger.warn(f"Product '{p.handle}' has no title — skipping.")
             products_failed += 1
             continue
+
+        variable = _is_variable(p)
+        product_type_label = "variable" if variable else "simple"
+        active_opts = _active_option_count(p)
+
+        logger.info(
+            f"[PRODUCT] handle={p.handle!r} type={product_type_label} "
+            f"variants={len(p.variants)} options={active_opts} images={len(p.images)}"
+        )
+
+        # Log each attribute mapping decision.
+        for name, idx, num in [
+            (p.option1_name, 0, "1"),
+            (p.option2_name, 1, "2"),
+            (p.option3_name, 2, "3"),
+        ]:
+            if name:
+                if name.lower() == "title" and not variable:
+                    logger.info(
+                        f"[ATTR SKIP] handle={p.handle!r} "
+                        f"option{num}_name={name!r} — Shopify placeholder, not exported as attribute"
+                    )
+                else:
+                    all_vals = _all_option_values(p, idx)
+                    logger.info(
+                        f"[ATTR MAP] handle={p.handle!r} "
+                        f"Attribute {num}: {name!r} → {all_vals!r}"
+                    )
+
+        # Log each variation being generated.
+        if variable:
+            for i, v in enumerate(p.variants):
+                logger.info(
+                    f"[VARIATION] handle={p.handle!r} idx={i} sku={v.sku!r} "
+                    f"opt1={v.option1_value!r} opt2={v.option2_value!r} opt3={v.option3_value!r} "
+                    f"price={v.price!r}"
+                )
+
         valid_products.append(p)
         products_converted += 1
         variants_converted += len(p.variants)
@@ -111,9 +149,14 @@ def convert(
         if p.product_type:
             categories_mapped += 1
         tags_preserved += len(p.tags)
+        if variable:
+            variable_products += 1
+        else:
+            simple_products += 1
 
     logger.info(
-        f"Products: {products_converted} converted, {products_failed} skipped. "
+        f"Products: {products_converted} converted ({simple_products} simple, "
+        f"{variable_products} variable), {products_failed} skipped. "
         f"Variants: {variants_converted}. Images: {images_mapped}."
     )
 
@@ -121,12 +164,34 @@ def convert(
     output_files: list[str] = []
     woo_output = os.path.join(output_dir, "woocommerce_products.csv")
     woo = WooCommerceAdapter()
+    rows_written = 0
     try:
         rows_written = woo.export(valid_products, woo_output)
         output_files.append("woocommerce_products.csv")
-        logger.info(f"Exported {rows_written} WooCommerce row(s).")
+        logger.info(f"Exported {rows_written} WooCommerce row(s) to CSV.")
     except Exception as exc:
         logger.error(f"WooCommerce export failed: {exc}")
+
+    # ── Post-export verification ───────────────────────────────────────────
+    verification_errors: list[str] = []
+    if rows_written > 0 and os.path.isfile(woo_output):
+        logger.info("Running post-export WooCommerce CSV verification…")
+        try:
+            verification_errors = verify_woocommerce_csv(woo_output)
+            if verification_errors:
+                for ve in verification_errors:
+                    logger.warn(f"[VERIFY] {ve}")
+                logger.warn(
+                    f"Verification found {len(verification_errors)} issue(s). "
+                    "Review the migration report for details."
+                )
+            else:
+                logger.info(
+                    "Verification passed — CSV structure is valid for "
+                    "WooCommerce 10.9.1 native importer."
+                )
+        except Exception as exc:
+            logger.warn(f"Post-export verification failed to run: {exc}")
 
     # ── Migration report ──────────────────────────────────────────────────
     provisional = ConversionResult(
@@ -141,6 +206,9 @@ def convert(
         execution_time_seconds=round(time.perf_counter() - start, 3),
         output_files=output_files,
         log_lines=logger.lines,
+        simple_products=simple_products,
+        variable_products=variable_products,
+        verification_errors=verification_errors,
     )
 
     report_path = os.path.join(output_dir, "migration_report.txt")
@@ -187,4 +255,7 @@ def convert(
         execution_time_seconds=elapsed,
         output_files=output_files,
         log_lines=logger.lines,
+        simple_products=simple_products,
+        variable_products=variable_products,
+        verification_errors=verification_errors,
     )

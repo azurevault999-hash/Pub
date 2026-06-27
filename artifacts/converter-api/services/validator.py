@@ -69,7 +69,9 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
     variant_images = df.get("Variant Image", pd.Series(dtype=str)).apply(_str)
     opt1_names = df.get("Option1 Name", pd.Series(dtype=str)).apply(_str)
     opt1_vals = df.get("Option1 Value", pd.Series(dtype=str)).apply(_str)
+    opt2_names = df.get("Option2 Name", pd.Series(dtype=str)).apply(_str)
     opt2_vals = df.get("Option2 Value", pd.Series(dtype=str)).apply(_str)
+    opt3_names = df.get("Option3 Name", pd.Series(dtype=str)).apply(_str)
     opt3_vals = df.get("Option3 Value", pd.Series(dtype=str)).apply(_str)
     bodies = df.get("Body (HTML)", pd.Series(dtype=str)).apply(_str)
     vendors = df.get("Vendor", pd.Series(dtype=str)).apply(_str)
@@ -94,7 +96,15 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
     handle_to_no_vendor: list[str] = []
     handle_to_no_seo: list[str] = []
 
-    for handle_val, group in df.groupby("Handle", sort=False):
+    # Attribute discovery: collect all unique option names used across the file.
+    attr_name_set: set[str] = set()
+    # Per-product attribute mapping details for info reporting.
+    attr_mapping_details: list[str] = []
+    # Product type counts (simple vs variable).
+    variable_handles: set[str] = set()
+    simple_handles: set[str] = set()
+
+    for handle_val, group in (df.groupby("Handle", sort=False) if "Handle" in df.columns else []):
         h = _str(handle_val)
         if not h:
             continue
@@ -148,9 +158,44 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         if not seo_t and not seo_d:
             handle_to_no_seo.append(h)
 
+        # ── Attribute discovery and product-type classification ──────────────
+        opt1_name = _str(first.get("Option1 Name", ""))
+        opt2_name = _str(first.get("Option2 Name", ""))
+        opt3_name = _str(first.get("Option3 Name", ""))
+
+        active_option_names = [n for n in (opt1_name, opt2_name, opt3_name) if n]
+        for n in active_option_names:
+            attr_name_set.add(n)
+
+        # Determine if this product is variable (mirrors the WooCommerce adapter logic).
+        variant_rows = group[
+            group.get("Variant Price", pd.Series(dtype=str)).apply(_str).ne("") |
+            group.get("Option1 Value", pd.Series(dtype=str)).apply(_str).ne("") |
+            group.get("Option2 Value", pd.Series(dtype=str)).apply(_str).ne("") |
+            group.get("Option3 Value", pd.Series(dtype=str)).apply(_str).ne("")
+        ]
+
+        if opt1_name and (opt2_name or opt3_name):
+            # Multiple option dimensions → always variable.
+            variable_handles.add(h)
+        elif opt1_name:
+            real_opt1_vals = {
+                _str(r) for r in group.get("Option1 Value", pd.Series(dtype=str)).apply(_str)
+                if _str(r) and _str(r).lower() != "default title"
+            }
+            if len(real_opt1_vals) > 1:
+                variable_handles.add(h)
+            else:
+                simple_handles.add(h)
+        else:
+            simple_handles.add(h)
+
+        # Record attribute mapping summary for the info check.
+        if active_option_names:
+            opt_summary = ", ".join(active_option_names)
+            attr_mapping_details.append(f"{h}: {opt_summary}")
+
     # ─── 1. Required columns ───────────────────────────────────────────────
-    # Handle and Title are structurally required; missing them means we cannot
-    # build any output.  Variant Price is optional (some export formats omit it).
     truly_required = {"Handle", "Title"}
     missing_required = truly_required - set(df.columns)
     if missing_required:
@@ -190,8 +235,6 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         issues.append(_pass("Missing Title", "All products have a Title."))
 
     # ─── 4. Duplicate SKUs ────────────────────────────────────────────────
-    # WARNING (not ERROR): WooCommerce requires unique SKUs for a clean import,
-    # but the conversion itself can proceed; the importer will reject duplicates.
     non_empty_skus = skus[skus != ""]
     dup_sku_vals = list(dict.fromkeys(non_empty_skus[non_empty_skus.duplicated()].tolist()))
     if dup_sku_vals:
@@ -218,8 +261,6 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         issues.append(_pass("Duplicate Image URLs", "No duplicate image URLs within any product."))
 
     # ─── 6. Missing prices on variant rows ────────────────────────────────
-    # Only flag rows that are genuine variant rows (have option/price data).
-    # Image-only rows legitimately have no Variant Price.
     variant_prices = prices[is_variant_row]
     missing_price_count = int((variant_prices == "").sum())
     if missing_price_count:
@@ -312,9 +353,10 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         issues.append(_pass("Invalid Image URLs", "All image URLs are valid HTTP(S) URLs."))
 
     # ─── 12. Variant Image coverage ───────────────────────────────────────
-    # Rule (per spec):
-    #   Variant Image blank + Image Src exists  → INFO (product images used as fallback)
-    #   Both Variant Image and Image Src blank  → ERROR (no image for that variation)
+    # Variant Image is optional per spec.
+    # • Variant Image blank + Image Src exists  → INFO (product images used as fallback)
+    # • Both Variant Image and Image Src blank  → WARNING (no image for that variation,
+    #   but this does not block conversion — WooCommerce still imports the product)
     no_var_image_handles: list[str] = []
     no_image_at_all_handles: list[str] = []
     for h in unique_handles:
@@ -326,10 +368,12 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
             no_var_image_handles.append(h)
 
     if no_image_at_all_handles:
-        issues.append(_error(
+        # Downgraded from ERROR to WARNING: Variant Image is optional;
+        # a missing image does not prevent a valid WooCommerce import.
+        issues.append(_warn(
             "Variant Image — No Images at All",
             f"{len(no_image_at_all_handles)} product(s) have neither a Variant Image nor "
-            "an Image Src. WooCommerce variations require at least one image.",
+            "an Image Src. Products will import without images.",
             count=len(no_image_at_all_handles),
             details=sorted(no_image_at_all_handles),
         ))
@@ -352,7 +396,7 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         issues.append(_warn(
             "Malformed HTML",
             f"{len(handle_to_malformed_html)} product(s) have potentially malformed "
-            "HTML in their description. Review before importing.",
+            "HTML in their description. HTML is preserved as-is; review before importing.",
             count=len(handle_to_malformed_html),
             details=handle_to_malformed_html,
         ))
@@ -419,6 +463,59 @@ def validate(df: pd.DataFrame) -> ValidationResult:  # noqa: C901
         ))
     else:
         issues.append(_pass("Missing SEO Fields", "All products have SEO Title or SEO Description."))
+
+    # ─── 19. CSV statistics (INFO) ────────────────────────────────────────
+    total_products = len(unique_handles)
+    total_variant_rows = int(is_variant_row.sum())
+    total_image_srcs = int((image_srcs != "").sum())
+    issues.append(_info(
+        "CSV Statistics",
+        f"File contains {total_products} product(s), "
+        f"{total_variant_rows} variant row(s), "
+        f"{total_image_srcs} image reference(s).",
+        count=total_products,
+    ))
+
+    # ─── 20. Product type breakdown (INFO) ────────────────────────────────
+    n_variable = len(variable_handles)
+    n_simple = len(simple_handles)
+    issues.append(_info(
+        "Product Type Breakdown",
+        f"{n_simple} simple product(s) and {n_variable} variable product(s) detected. "
+        "Simple = no meaningful option variation; Variable = selectable options in storefront.",
+        count=n_variable + n_simple,
+        details=[
+            f"Simple: {n_simple}",
+            f"Variable: {n_variable}",
+        ],
+    ))
+
+    # ─── 21. Attribute mapping (INFO) ─────────────────────────────────────
+    if attr_name_set:
+        attr_list = sorted(attr_name_set)
+        # Exclude the "Title" placeholder from the meaningful attribute list.
+        real_attrs = [a for a in attr_list if a.lower() != "title"]
+        if real_attrs:
+            issues.append(_info(
+                "Attribute Mapping",
+                f"{len(real_attrs)} distinct attribute name(s) discovered across all products. "
+                "All will be dynamically mapped to WooCommerce attribute columns.",
+                count=len(real_attrs),
+                details=real_attrs,
+            ))
+        else:
+            issues.append(_info(
+                "Attribute Mapping",
+                "Only the Shopify 'Title' placeholder option found. "
+                "Products will be imported as Simple type.",
+                count=0,
+            ))
+    else:
+        issues.append(_info(
+            "Attribute Mapping",
+            "No option names found in the file. All products will be imported as Simple type.",
+            count=0,
+        ))
 
     # ─── Counts & result ──────────────────────────────────────────────────
     pass_count = sum(1 for i in issues if i.level == "pass")
